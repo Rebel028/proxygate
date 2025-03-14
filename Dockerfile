@@ -4,7 +4,7 @@ FROM golang:1.23-alpine AS builder
 WORKDIR /workspace
 # Copy the entire workspace (to utilize go.work for dependency management)
 COPY . .
-RUN go build -o /proxygate
+RUN go build -o ./proxygate
 
 # Stage 2: Runtime
 FROM alpine:latest
