@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - master
+    paths:
+      - VERSION
+      - Dockerfile
 
 env:
   # Use docker.io for Docker Hub if empty
