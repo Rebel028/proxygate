@@ -73,7 +73,9 @@ func startHTTPProxyServer(addr string) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
 
-	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
+	if httpsMitm {
+		proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
+	}
 	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		if !checkBasicAuth(req) {
 			return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusProxyAuthRequired, "Proxy Authentication Required")
