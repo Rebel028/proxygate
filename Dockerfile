@@ -6,7 +6,7 @@ WORKDIR /workspace
 COPY . .
 # Navigate to the project directory and build the binary
 WORKDIR /workspace/proxygate
-RUN go build -o /proxygate -tags timetzdata
+RUN go build -o /proxygate
 
 # Stage 2: Runtime
 FROM alpine:latest
