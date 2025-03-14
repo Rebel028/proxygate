@@ -25,6 +25,7 @@ var (
 	basicAuth    bool
 	httpUsername string
 	httpPassword string
+	httpsMitm    bool
 )
 
 func init() {
@@ -48,6 +49,9 @@ func loadEnvCredentials() {
 	}
 	if envPass := os.Getenv("PROXY_PASS"); httpPassword == "" && envPass != "" {
 		httpPassword = envPass
+	}
+	if envMitm := os.Getenv("PROXY_MITM"); envMitm != "False" && envMitm != "false" {
+		httpsMitm = true
 	}
 }
 
