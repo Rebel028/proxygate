@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -17,7 +19,7 @@ func loadProxies(filename string) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		proxy := parseProxy(line)
+		proxy, _ := parseProxy(line)
 		proxyPool = append(proxyPool, proxy)
 	}
 	if err := scanner.Err(); err != nil {
@@ -26,27 +28,59 @@ func loadProxies(filename string) {
 	fmt.Printf("Loaded %d proxies.\n", len(proxyPool))
 }
 
-func parseProxy(line string) Proxy {
-	protocol := "http" // default protocol
-	address := line
-	auth := ""
+var ipPortPattern = regexp.MustCompile(`^([\d\.]+):(\d+)(?::([^:]+):([^:]+))?$`)
 
-	parts := strings.Split(line, "://")
-	if len(parts) == 2 {
-		protocolParts := parts[0]
-		address = parts[1]
-		if strings.HasPrefix(protocolParts, "socks") {
-			protocol = "socks5"
-		} else {
-			protocol = protocolParts
+func parseProxy(line string) (*Proxy, error) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil, fmt.Errorf("empty line")
+	}
+
+	if matches := ipPortPattern.FindStringSubmatch(line); matches != nil {
+		return &Proxy{
+			Protocol: "http", // Default to HTTP for ip:port format
+			Address:  fmt.Sprintf("%s:%s", matches[1], matches[2]),
+			Auth: &Auth{
+				Username: matches[3],
+				Password: matches[4],
+			},
+		}, nil
+	}
+
+	parsedURL, err := url.Parse(line)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy format: %s", line)
+	}
+
+	protocol := parsedURL.Scheme
+	if protocol == "socks" {
+		protocol = "socks5"
+	}
+
+	proxy := &Proxy{
+		Protocol: protocol,
+		Address:  parsedURL.Host,
+	}
+
+	if parsedURL.User != nil {
+		username := parsedURL.User.Username()
+		password, _ := parsedURL.User.Password()
+		proxy.Auth = &Auth{
+			Username: username,
+			Password: password,
 		}
 	}
 
-	authParts := strings.Split(address, "@")
-	if len(authParts) == 2 {
-		auth = authParts[0]
-		address = authParts[1]
-	}
+	return proxy, nil
+}
 
-	return Proxy{Protocol: protocol, Address: address, Auth: auth}
+func (p Proxy) getUrl() *url.URL {
+	var str string
+	if p.Auth != nil && p.Auth.Username != "" && p.Auth.Password != "" {
+		str = fmt.Sprintf("%s://%s:%s@%s", p.Protocol, p.Auth.Username, p.Auth.Password, p.Address)
+	} else {
+		str = fmt.Sprintf("%s://%s", p.Protocol, p.Address)
+	}
+	proxyUrl, _ := url.Parse(str)
+	return proxyUrl
 }

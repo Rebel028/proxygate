@@ -1,32 +1,51 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
-	"github.com/elazarl/goproxy"
-	"golang.org/x/net/proxy" // Use this for SOCKS5 proxy support
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"sync"
+
+	"github.com/elazarl/goproxy"
 )
 
 type Proxy struct {
 	Protocol string
 	Address  string
-	Auth     string
+	Auth     *Auth
+}
+
+type Auth struct {
+	Username string
+	Password string
 }
 
 var (
-	proxyPool    []Proxy //todo: replace with sqlite
+	proxyPool    []*Proxy //todo: replace with sqlite
 	mutex        = &sync.Mutex{}
 	basicAuth    bool
 	httpUsername string
 	httpPassword string
-	httpsMitm    bool
+	handler      ConnectHandler
 )
+
+type ConnectHandler struct {
+}
+
+func (h ConnectHandler) HandleConnect(req string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+	log.Printf("CONNECT request to: %s", req)
+	return goproxy.OkConnect, req
+}
+
+const _proxyAuthHeader = "Proxy-Authorization"
+
+func SetBasicAuth(username, password string, req *http.Request) {
+	req.Header.Set(_proxyAuthHeader, "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+}
 
 func init() {
 	flag.StringVar(&httpUsername, "user", "", "Username for HTTP proxy basic authentication")
@@ -50,9 +69,6 @@ func loadEnvCredentials() {
 	if envPass := os.Getenv("PROXY_PASS"); httpPassword == "" && envPass != "" {
 		httpPassword = envPass
 	}
-	if envMitm := os.Getenv("PROXY_MITM"); envMitm != "False" && envMitm != "false" {
-		httpsMitm = true
-	}
 }
 
 func validateCredentials() {
@@ -66,45 +82,53 @@ func validateCredentials() {
 func getRandomProxy() Proxy {
 	mutex.Lock()
 	defer mutex.Unlock()
-	return proxyPool[rand.Intn(len(proxyPool))] //todo: rotate proxies with more background logic
+
+	if len(proxyPool) == 0 {
+		log.Println("Warning: Proxy pool is empty")
+		log.Fatal("No proxies available")
+	}
+
+	return *proxyPool[rand.Intn(len(proxyPool))] //todo: rotate proxies with more background logic
+}
+
+// Add a new function to handle proxy failures
+func markProxyAsFailed(p Proxy) {
+	// In the future, this could update a database or remove the proxy from the pool
+	log.Printf("Marking proxy as failed: %s://%s", p.Protocol, p.Address)
+	// For now, we just log it, but this could be expanded to track failures and remove bad proxies
 }
 
 func startHTTPProxyServer(addr string) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
 
-	if httpsMitm {
-		proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
-	}
+	// Configure to handle CONNECT for HTTPS without MITM
+	proxy.OnRequest().HandleConnect(handler)
+	proxy.ConnectDial = newConnectDialToRandomProxy(proxy)
+
+	// Handle HTTP requests
 	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		if !checkBasicAuth(req) {
 			return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusProxyAuthRequired, "Proxy Authentication Required")
 		}
 
-		selectedProxy := getRandomProxy()
-		log.Printf("Using Proxy: %s\n", selectedProxy.Address)
+		log.Printf("Proxying request to: %s %s", req.Method, req.URL)
 
-		client, err := makeHTTPClient(selectedProxy)
-		if err != nil {
-			return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusBadGateway, err.Error())
+		return req, nil
+	})
+
+	// Add error handling for responses
+	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		if resp == nil {
+			log.Printf("No response received for request to: %s", ctx.Req.URL)
+			return nil
 		}
 
-		// Create a new request for forwarding
-		forwardReq, err := http.NewRequest(req.Method, req.URL.String(), req.Body)
-		if err != nil {
-			return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusBadGateway, err.Error())
+		if resp.StatusCode >= 500 {
+			log.Printf("Received error status %d for request to: %s", resp.StatusCode, ctx.Req.URL)
 		}
 
-		// Copy the headers
-		forwardReq.Header = req.Header.Clone()
-
-		// Forward the request using the newly created client
-		resp, err := client.Do(forwardReq)
-		if err != nil {
-			//todo: handle bad proxy
-			return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusBadGateway, err.Error())
-		}
-		return req, resp
+		return resp
 	})
 
 	log.Printf("Starting HTTP proxy server on %s\n", addr)
@@ -119,33 +143,8 @@ func checkBasicAuth(req *http.Request) bool {
 	return true
 }
 
-func makeHTTPClient(pr Proxy) (*http.Client, error) {
-	proxyURL, err := url.Parse(buildProxyURL(pr))
-	if err != nil {
-		return nil, fmt.Errorf("invalid proxy URL: %v", err)
-	}
-
-	if pr.Protocol == "socks5" {
-		dialer, err := proxy.SOCKS5("tcp", pr.Address, nil, proxy.Direct)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create SOCKS5 proxy: %v", err)
-		}
-		return &http.Client{
-			Transport: &http.Transport{
-				Dial: dialer.Dial,
-			},
-		}, nil
-	}
-
-	return &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
-		},
-	}, nil
-}
-
 func buildProxyURL(proxy Proxy) string {
-	if proxy.Auth != "" {
+	if proxy.Auth != nil {
 		return fmt.Sprintf("%s://%s@%s", proxy.Protocol, proxy.Auth, proxy.Address)
 	}
 	return fmt.Sprintf("%s://%s", proxy.Protocol, proxy.Address)
