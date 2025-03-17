@@ -1,5 +1,5 @@
 # ProxyGate 
-ProxyPivot is a simple yet powerful Golang-based HTTP proxy server that routes requests through a pool of provided proxy servers. It supports both HTTP and SOCKS5 proxies, offering flexible and secure request forwarding.
+ProxyGate is a simple yet powerful Golang-based HTTP proxy server that routes requests through a pool of provided proxy servers. It supports both HTTP and SOCKS5 proxies, offering flexible and secure request forwarding.
 
 ## Features
 
@@ -66,20 +66,20 @@ docker run -d -p 8080:8080 -e PROXY_USER=yourUsername -e PROXY_PASS=yourPassword
 
   The `proxy_list.txt` file should include proxies in the following formats:
 
-  ```
-  ip:port
-  ip:port:username:password
-  http://ip:port
-  http://username:password@ip:port
-  https://ip:port
-  https://username:password@ip:port
-  socks://ip:port
-  socks://username:password@ip:port
-  socks4://ip:port
-  socks4://username:password@ip:port
-  socks5://ip:port
-  socks5://username:password@ip:port
-  ```
+ 
+*   `ip:port`
+*   `ip:port:username:password`
+*   `http://ip:port`
+*   `http://username:password@ip:port`
+*   `https://ip:port`
+*   `https://username:password@ip:port`
+*   `socks://ip:port`
+*   `socks://username:password@ip:port`
+*   `socks4://ip:port`
+*   `socks4://username:password@ip:port`
+*   `socks5://ip:port`
+*   `socks5://username:password@ip:port`
+
 
 - **Access the Proxy**
 
