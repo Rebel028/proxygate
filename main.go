@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/base64"
 	"flag"
-	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -39,12 +37,6 @@ type ConnectHandler struct {
 func (h ConnectHandler) HandleConnect(req string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
 	log.Printf("CONNECT request to: %s", req)
 	return goproxy.OkConnect, req
-}
-
-const _proxyAuthHeader = "Proxy-Authorization"
-
-func SetBasicAuth(username, password string, req *http.Request) {
-	req.Header.Set(_proxyAuthHeader, "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
 }
 
 func init() {
@@ -91,13 +83,6 @@ func getRandomProxy() Proxy {
 	return *proxyPool[rand.Intn(len(proxyPool))] //todo: rotate proxies with more background logic
 }
 
-// Add a new function to handle proxy failures
-func markProxyAsFailed(p Proxy) {
-	// In the future, this could update a database or remove the proxy from the pool
-	log.Printf("Marking proxy as failed: %s://%s", p.Protocol, p.Address)
-	// For now, we just log it, but this could be expanded to track failures and remove bad proxies
-}
-
 func startHTTPProxyServer(addr string) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
@@ -141,11 +126,4 @@ func checkBasicAuth(req *http.Request) bool {
 		return ok && username == httpUsername && password == httpPassword
 	}
 	return true
-}
-
-func buildProxyURL(proxy Proxy) string {
-	if proxy.Auth != nil {
-		return fmt.Sprintf("%s://%s@%s", proxy.Protocol, proxy.Auth, proxy.Address)
-	}
-	return fmt.Sprintf("%s://%s", proxy.Protocol, proxy.Address)
 }

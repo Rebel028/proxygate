@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,12 @@ import (
 )
 
 var _errorRespMaxLength int64 = 500
+
+const _proxyAuthHeader = "Proxy-Authorization"
+
+func SetBasicAuth(username, password string, req *http.Request) {
+	req.Header.Set(_proxyAuthHeader, "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+}
 
 func newConnectDialToRandomProxy(proxy *goproxy.ProxyHttpServer) func(network, addr string) (net.Conn, error) {
 	return func(network, addr string) (net.Conn, error) {
@@ -133,4 +140,11 @@ func dial(proxy *goproxy.ProxyHttpServer, ctx *goproxy.ProxyCtx, network, addr s
 	// if the user didn't specify any dialer, we just use the default one,
 	// provided by net package
 	return net.Dial(network, addr)
+}
+
+// Add a new function to handle proxy failures
+func markProxyAsFailed(p Proxy) {
+	// In the future, this could update a database or remove the proxy from the pool
+	log.Printf("Marking proxy as failed: %s://%s", p.Protocol, p.Address)
+	// For now, we just log it, but this could be expanded to track failures and remove bad proxies
 }
