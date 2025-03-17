@@ -18,10 +18,16 @@ ProxyGate is a simple yet powerful Golang-based HTTP proxy server that routes re
 
 ### Prerequisites
 
-- Go 1.23 or newer
+- Go 1.23 or newer or Docker
 - A list of proxy servers in `proxy_list.txt` format
 
 ### Installation
+
+#### Docker
+
+```bash
+docker run -d -p 8080:8080 -e PROXY_USER=yourUsername -e PROXY_PASS=yourPassword -v $(pwd)/proxy_list.txt:/app/proxy_list.txt --name proxygate ghcr.io/rebel028/proxygate:latest
+```
 
 #### Build from source
 
@@ -54,15 +60,9 @@ ProxyGate is a simple yet powerful Golang-based HTTP proxy server that routes re
    ./proxygate
    ```
 
-#### Docker
-
-```bash
-docker run -d -p 8080:8080 -e PROXY_USER=yourUsername -e PROXY_PASS=yourPassword -v $(pwd)/proxy_list.txt:/app/proxy_list.txt --name proxygate ghcr.io/rebel028/proxygate:latest
-```
-
 ### Usage
 
-- **Proxy File Format**
+#### Proxy File Format
 
   The `proxy_list.txt` file should include proxies in the following formats:
 
@@ -81,7 +81,7 @@ docker run -d -p 8080:8080 -e PROXY_USER=yourUsername -e PROXY_PASS=yourPassword
 *   `socks5://username:password@ip:port`
 
 
-- **Access the Proxy**
+#### Access the Proxy
 
   Use any HTTP client to send requests through the proxy server running on `localhost:8080`, e.g., with `curl`:
 
