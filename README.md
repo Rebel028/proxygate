@@ -12,6 +12,7 @@ ProxyGate is a simple yet powerful Golang-based HTTP proxy server that routes re
 ## ToDo:
 - handle bad proxies
 - add blacklists
+- sticky sessions
 - more flexible proxy rotation logic
 
 ## Getting Started
