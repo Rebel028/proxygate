@@ -22,3 +22,5 @@
 # vendor/
 
 **/.env**
+
+proxy_list.txt

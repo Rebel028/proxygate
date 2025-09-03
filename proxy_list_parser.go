@@ -36,17 +36,17 @@ func parseProxy(line string) (*Proxy, error) {
 		return nil, fmt.Errorf("empty line")
 	}
 
-	if matches := ipPortPattern.FindStringSubmatch(line); matches != nil {
-		return &Proxy{
-			Protocol: "http", // Default to HTTP for ip:port format
-			Address:  fmt.Sprintf("%s:%s", matches[1], matches[2]),
-			Auth: &Auth{
-				Username: matches[3],
-				Password: matches[4],
-			},
-		}, nil
+	// Try parsing host:port:user:password format
+	p, success := TryParseColonFormatted(line)
+	if success {
+		return p, nil
 	}
+	// Try parsing URL format
+	return TryParseUrlFormatted(line)
+}
 
+// TryParseUrlFormatted parsing URL formatted proxy
+func TryParseUrlFormatted(line string) (*Proxy, error) {
 	parsedURL, err := url.Parse(line)
 	if err != nil {
 		return nil, fmt.Errorf("invalid proxy format: %s", line)
@@ -69,9 +69,42 @@ func parseProxy(line string) (*Proxy, error) {
 			Username: username,
 			Password: password,
 		}
+	} else {
+		if globalAuthCredentialsSupplied {
+			proxy.Auth = &Auth{
+				Username: httpUsername,
+				Password: httpPassword,
+			}
+		}
 	}
 
 	return proxy, nil
+}
+
+// TryParseColonFormatted parsing host:port:user:password format
+func TryParseColonFormatted(line string) (*Proxy, bool) {
+	if matches := ipPortPattern.FindStringSubmatch(line); matches != nil {
+		var username, password string //todo: use more elegant way to define basic auth
+		if len(matches) == 5 {        // means we have host:port:user:password
+			username = matches[3]
+			password = matches[4]
+		} else {
+			// if credentials are supplied globally
+			if globalAuthCredentialsSupplied {
+				username = httpUsername
+				password = httpPassword
+			}
+		}
+		return &Proxy{
+			Protocol: "http", // Default to HTTP for ip:port format
+			Address:  fmt.Sprintf("%s:%s", matches[1], matches[2]),
+			Auth: &Auth{
+				Username: username,
+				Password: password,
+			},
+		}, true
+	}
+	return nil, false
 }
 
 func (p Proxy) getUrl() *url.URL {

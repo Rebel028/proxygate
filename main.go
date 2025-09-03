@@ -23,12 +23,12 @@ type Auth struct {
 }
 
 var (
-	proxyPool    []*Proxy //todo: replace with sqlite
-	mutex        = &sync.Mutex{}
-	basicAuth    bool
-	httpUsername string
-	httpPassword string
-	handler      ConnectHandler
+	proxyPool                     []*Proxy //todo: replace with sqlite
+	mutex                         = &sync.Mutex{}
+	globalAuthCredentialsSupplied bool
+	httpUsername                  string
+	httpPassword                  string
+	handler                       ConnectHandler
 )
 
 type ConnectHandler struct {
@@ -65,9 +65,9 @@ func loadEnvCredentials() {
 
 func validateCredentials() {
 	if httpUsername == "" || httpPassword == "" {
-		basicAuth = false
+		globalAuthCredentialsSupplied = false
 	} else {
-		basicAuth = true
+		globalAuthCredentialsSupplied = true
 	}
 }
 
@@ -121,7 +121,7 @@ func startHTTPProxyServer(addr string) {
 }
 
 func checkBasicAuth(req *http.Request) bool {
-	if basicAuth {
+	if globalAuthCredentialsSupplied {
 		username, password, ok := req.BasicAuth()
 		return ok && username == httpUsername && password == httpPassword
 	}
