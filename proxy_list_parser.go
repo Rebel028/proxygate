@@ -70,7 +70,7 @@ func TryParseUrlFormatted(line string) (*Proxy, error) {
 			Password: password,
 		}
 	} else {
-		if globalAuthCredentialsSupplied {
+		if proxyServerAuthRequired {
 			proxy.Auth = &Auth{
 				Username: httpUsername,
 				Password: httpPassword,
@@ -90,7 +90,7 @@ func TryParseColonFormatted(line string) (*Proxy, bool) {
 			password = matches[4]
 		} else {
 			// if credentials are supplied globally
-			if globalAuthCredentialsSupplied {
+			if proxyServerAuthRequired {
 				username = httpUsername
 				password = httpPassword
 			}

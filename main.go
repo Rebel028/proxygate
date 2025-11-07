@@ -23,21 +23,17 @@ type Auth struct {
 }
 
 var (
-	proxyPool                     []*Proxy //todo: replace with sqlite
-	mutex                         = &sync.Mutex{}
-	globalAuthCredentialsSupplied bool
-	httpUsername                  string
-	httpPassword                  string
-	handler                       ConnectHandler
+	proxy                   *goproxy.ProxyHttpServer
+	proxyPool               []*Proxy //todo: replace with sqlite
+	mutex                   = &sync.Mutex{}
+	proxyServerAuthRequired bool
+	httpUsername            string
+	httpPassword            string
+
+	// sticky session support
+	// maps header value -> Proxy
+	stickySessionToProxy sync.Map
 )
-
-type ConnectHandler struct {
-}
-
-func (h ConnectHandler) HandleConnect(req string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
-	log.Printf("CONNECT request to: %s", req)
-	return goproxy.OkConnect, req
-}
 
 func init() {
 	flag.StringVar(&httpUsername, "user", "", "Username for HTTP proxy basic authentication")
@@ -65,9 +61,9 @@ func loadEnvCredentials() {
 
 func validateCredentials() {
 	if httpUsername == "" || httpPassword == "" {
-		globalAuthCredentialsSupplied = false
+		proxyServerAuthRequired = false
 	} else {
-		globalAuthCredentialsSupplied = true
+		proxyServerAuthRequired = true
 	}
 }
 
@@ -84,46 +80,12 @@ func getRandomProxy() Proxy {
 }
 
 func startHTTPProxyServer(addr string) {
-	proxy := goproxy.NewProxyHttpServer()
+	proxy = goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
 
 	// Configure to handle CONNECT for HTTPS without MITM
-	proxy.OnRequest().HandleConnect(handler)
-	proxy.ConnectDial = newConnectDialToRandomProxy(proxy)
-
-	// Handle HTTP requests
-	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		if !checkBasicAuth(req) {
-			return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusProxyAuthRequired, "Proxy Authentication Required")
-		}
-
-		log.Printf("Proxying request to: %s %s", req.Method, req.URL)
-
-		return req, nil
-	})
-
-	// Add error handling for responses
-	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		if resp == nil {
-			log.Printf("No response received for request to: %s", ctx.Req.URL)
-			return nil
-		}
-
-		if resp.StatusCode >= 500 {
-			log.Printf("Received error status %d for request to: %s", resp.StatusCode, ctx.Req.URL)
-		}
-
-		return resp
-	})
+	proxy.ConnectDialWithReq = connectDialHandler
 
 	log.Printf("Starting HTTP proxy server on %s\n", addr)
 	log.Fatal(http.ListenAndServe(addr, proxy))
-}
-
-func checkBasicAuth(req *http.Request) bool {
-	if globalAuthCredentialsSupplied {
-		username, password, ok := req.BasicAuth()
-		return ok && username == httpUsername && password == httpPassword
-	}
-	return true
 }
