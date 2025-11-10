@@ -6,14 +6,18 @@ ProxyGate is a simple yet powerful Golang-based HTTP proxy server that routes re
 - **HTTP Proxy Server**: Offers a simple HTTP proxy interface.
 - **Proxy Pool**: Reads and parses a list of proxies from a file, supporting various formats.
 - **Random Proxy Selection**: Randomly selects a proxy from the pool for each request.
+- **Sticky Sessions**: Honors the `X-Proxy-Session` header to consistently reuse the same upstream proxy.
 - **Basic Authentication**: Secures the proxy server with a username and password.
 - **Logging**: Logs each request and the selected proxy for easy debugging.
 
-## ToDo:
-- handle bad proxies
-- add blacklists
-- sticky sessions
-- more flexible proxy rotation logic
+## Project Structure
+
+- `cmd/proxygate`: CLI entrypoint used to build the executable.
+- `internal/app`: Runtime orchestration that wires configuration, proxy pool, and server.
+- `internal/config`: Parses command-line flags and environment variables.
+- `internal/auth`: Utilities for working with credentials and authorization headers.
+- `internal/proxy`: Proxy definitions, parsing logic, and pool management.
+- `internal/server`: HTTP proxy server runtime built on top of `github.com/elazarl/goproxy`.
 
 ## Getting Started
 
@@ -87,23 +91,26 @@ docker run -d -p 8080:8080 -e PROXY_USER=yourUsername -e PROXY_PASS=yourPassword
   Use any HTTP client to send requests through the proxy server running on `localhost:8080`, e.g., with `curl`:
 
   ```bash
-  curl -x http://yourUsername:yourPassword@localhost:8080 http://ipinfo.io
+  curl -x http://yourUsername:yourPassword@localhost:8080 https://ifconfig.me
   ```
 ---
 **Note**: Ensure that your proxy servers are correctly listed in `proxy_list.txt` and reachable from your network.
-
 
 ## Configuration
 
 - **Command-line Flags**:
     - `-user`: Username for basic authentication
     - `-pass`: Password for basic authentication
+    - `-listen`: Address for the proxy listener (default `:8080`)
+    - `-proxy-file`: Path to the proxy list file (default `proxy_list.txt`)
+    - `-verbose`: Enable verbose proxy logging
 
 - **Environment Variables**:
     - `PROXY_USER`: Alternative way to set the username
     - `PROXY_PASS`: Alternative way to set the password
 
+Both the username and password are required when enabling authentication. Supplying only one of them results in a startup error.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
