@@ -108,8 +108,17 @@ docker run -d -p 8080:8080 -e PROXY_USER=yourUsername -e PROXY_PASS=yourPassword
 - **Environment Variables**:
     - `PROXY_USER`: Alternative way to set the username
     - `PROXY_PASS`: Alternative way to set the password
+    - `PROXY_LISTEN`: Listener address (e.g. `:8080`, `0.0.0.0:8080`)
+    - `PROXY_FILE`: Path to the proxy list file
+    - `PROXY_VERBOSE`: Enable verbose proxy logging (`true/1/yes/on`)
 
 Both the username and password are required when enabling authentication. Supplying only one of them results in a startup error.
+
+Flags override environment variables. For example, the following starts on `:9090` regardless of `PROXY_LISTEN`:
+
+```bash
+PROXY_LISTEN=":8080" PROXY_FILE="proxy_list.txt" PROXY_VERBOSE="true" ./proxygate -listen :9090
+```
 
 ## License
 

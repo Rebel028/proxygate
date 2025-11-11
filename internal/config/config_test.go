@@ -71,3 +71,87 @@ func TestLoadReturnsErrorForIncompleteCredentials(t *testing.T) {
 		t.Fatalf("expected error when only password provided via env")
 	}
 }
+
+func TestLoadUsesEnvVarsForAllFlags(t *testing.T) {
+	t.Setenv("PROXY_LISTEN", ":9999")
+	t.Setenv("PROXY_FILE", "env_proxies.txt")
+	t.Setenv("PROXY_VERBOSE", "true")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ListenAddr != ":9999" {
+		t.Fatalf("expected listen addr :9999 from env, got %s", cfg.ListenAddr)
+	}
+
+	if cfg.ProxyListPath != "env_proxies.txt" {
+		t.Fatalf("expected proxy file env_proxies.txt from env, got %s", cfg.ProxyListPath)
+	}
+
+	if !cfg.Verbose {
+		t.Fatalf("expected verbose to be true from env")
+	}
+}
+
+func TestLoadFlagsOverrideEnvVars(t *testing.T) {
+	t.Setenv("PROXY_LISTEN", ":9999")
+	t.Setenv("PROXY_FILE", "env_proxies.txt")
+	t.Setenv("PROXY_VERBOSE", "false")
+
+	args := []string{
+		"-listen", ":7777",
+		"-proxy-file", "flag_proxies.txt",
+		"-verbose",
+	}
+
+	cfg, err := Load(args)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.ListenAddr != ":7777" {
+		t.Fatalf("expected listen addr :7777 from flag, got %s", cfg.ListenAddr)
+	}
+
+	if cfg.ProxyListPath != "flag_proxies.txt" {
+		t.Fatalf("expected proxy file flag_proxies.txt from flag, got %s", cfg.ProxyListPath)
+	}
+
+	if !cfg.Verbose {
+		t.Fatalf("expected verbose to be true from flag override")
+	}
+}
+
+func TestGetBoolEnvOrDefault(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected bool
+	}{
+		{"true", "true", true},
+		{"True", "True", true},
+		{"TRUE", "TRUE", true},
+		{"1", "1", true},
+		{"yes", "yes", true},
+		{"Yes", "Yes", true},
+		{"on", "on", true},
+		{"false", "false", false},
+		{"0", "0", false},
+		{"no", "no", false},
+		{"off", "off", false},
+		{"empty", "", false},
+		{"invalid", "invalid", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PROXY_VERBOSE", tt.envValue)
+			result := getBoolEnvOrDefault(envProxyVerbose, false)
+			if result != tt.expected {
+				t.Fatalf("expected %v for env value %q, got %v", tt.expected, tt.envValue, result)
+			}
+		})
+	}
+}
